@@ -15,13 +15,22 @@ module MetricFu
     end
 
     def run!(files, config_files)
-      files.map do |file|
-        examiner.new(file, config_files)
+      case reek_major_version
+      when 1
+        examiner.new(files, config_files)
+      when 2, 3
+        files.map do |file|
+          examiner.new(file, config_files)
+        end.map(&:smells).flatten
+      else # 4+
+        files.map do |file|
+          examiner.new(file)
+        end.map(&:smells).flatten
       end
     end
 
     def analyze
-      @matches = @output.map(&:smells).flatten.group_by(&:source).collect do |file_path, smells|
+      @matches = @output.group_by(&:source).collect do |file_path, smells|
         { file_path: file_path,
           code_smells: analyze_smells(smells) }
       end
@@ -90,5 +99,15 @@ module MetricFu
 
       Reek.const_defined?(:Examiner) ? Reek.const_get(:Examiner) : Reek.const_get(:Core).const_get(:Examiner)
     end
+
+    def reek_major_version
+      require "reek/version"
+      if Reek.const_defined?(:VERSION)
+        Reek::VERSION[0].to_i
+      else
+        Reek::Version::STRING[0].to_i
+      end
+    end
+
   end
 end
